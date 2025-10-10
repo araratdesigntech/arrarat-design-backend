@@ -179,6 +179,7 @@ export const signupService = async (req: Request, res: Response<ResponseT<null>>
       })
     );
   } catch (error: any) {
+    console.log(error, 'error');
     // Remove file from local uploads folder
     if (req.file?.filename) {
       const localFilePath = `${PWD}/public/uploads/users/${req.file?.filename}`;
@@ -768,7 +769,7 @@ export const resetPasswordService: RequestHandler = async (req, res, next) => {
 
     const confirmResetPasswordEmailLink = `${environmentConfig.WEBSITE_URL}/login`;
 
-    sendConfirmResetPasswordEmail(user.email, user.name, confirmResetPasswordEmailLink);
+    await sendConfirmResetPasswordEmail(user.email, user.name, confirmResetPasswordEmailLink);
 
     const data = {
       loginLink: confirmResetPasswordEmailLink,

@@ -2,7 +2,10 @@
 /* eslint-disable no-unused-vars */
 
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { environmentConfig } from '@src/configs/custom-environment-variables.config';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const host = environmentConfig.SMTP_HOST || '';
 const emailUsername = environmentConfig.SMTP_USERNAME || '';
@@ -46,28 +49,38 @@ let htmlContent = `<div style="max-width: 700px; margin:auto; border: 10px solid
         </div>
       </div>`;
 
-export const sendEmail = (userEmail: any) => {
-  const emailContent = {
-    from: environmentConfig?.ADMIN_SEND_GRID_EMAIL,
+export const sendEmail = async (userEmail: any) => {
+  await resend.emails.send({
+    from: 'Arrarat Designs <no-reply@araratdesigns.org>',
     to: userEmail,
     subject: 'Signup succeeded!',
     html: htmlContent,
-  };
-
-  transporter.sendMail(emailContent, function (error, _info) {
-    if (error) {
-      if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
-        console.log('Sending Email error:', error);
-        console.log('Sending Email error:');
-      }
-    } else if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
-      console.log(`Successfully  send email to ${userEmail}...`);
-    }
   });
 };
 
-export const sendResetPasswordEmail = (userEmail: string, userName: string, link: string) => {
-  htmlContent = `
+// export const sendEmail = (userEmail: any) => {
+//   const emailContent = {
+//     from: environmentConfig?.ADMIN_SEND_GRID_EMAIL,
+//     to: userEmail,
+//     subject: 'Signup succeeded!',
+//     html: htmlContent,
+//   };
+
+//   transporter.sendMail(emailContent, function (error, _info) {
+//     if (error) {
+//       if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+//         console.log('Sending Email error:', error);
+//         console.log('Sending Email error:');
+//       }
+//     } else if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+//       console.log(`Successfully  send email to ${userEmail}...`);
+//     }
+//   });
+// };
+
+export const sendResetPasswordEmail = async (userEmail: string, userName: string, link: string) => {
+  try {
+    htmlContent = `
 <!DOCTYPE html>
 <html lang="en-US">
   <head>
@@ -197,27 +210,38 @@ export const sendResetPasswordEmail = (userEmail: string, userName: string, link
 </html>
 `;
 
-  const emailContent = {
-    from: environmentConfig.ADMIN_SEND_GRID_EMAIL,
-    to: userEmail,
-    subject: 'Password Change Request',
-    html: htmlContent,
-  };
+    await resend.emails.send({
+      from: 'Arrarat Designs <no-reply@araratdesigns.org>',
+      to: userEmail,
+      subject: 'Password Change Request',
+      html: htmlContent,
+    });
 
-  transporter.sendMail(emailContent, function (error, _info) {
-    if (error) {
-      if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
-        console.log('Sending Email error:', error);
-        console.log('Sending Email error:');
-      }
-    } else if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
-      console.log(`Successfully  send email to ${userEmail}...`);
-    }
-  });
+    // const emailContent = {
+    //   from: environmentConfig.ADMIN_SEND_GRID_EMAIL,
+    //   to: userEmail,
+    //   subject: 'Password Change Request',
+    //   html: htmlContent,
+    // };
+
+    // transporter.sendMail(emailContent, function (error, _info) {
+    //   if (error) {
+    //     if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+    //       console.log('Sending Email error:', error);
+    //       console.log('Sending Email error:');
+    //     }
+    //   } else if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+    //     console.log(`Successfully  send email to ${userEmail}...`);
+    //   }
+    // });
+  } catch (error) {
+    console.error('❌ Error sending email:', error);
+  }
 };
 
-export const sendConfirmResetPasswordEmail = (userEmail: string, userName: string, link: string) => {
-  htmlContent = `
+export const sendConfirmResetPasswordEmail = async (userEmail: string, userName: string, link: string) => {
+  try {
+    htmlContent = `
 <!DOCTYPE html>
 <html lang="en-US">
   <head>
@@ -348,27 +372,43 @@ export const sendConfirmResetPasswordEmail = (userEmail: string, userName: strin
 </html>
 `;
 
-  const emailContent = {
-    from: environmentConfig.ADMIN_SEND_GRID_EMAIL,
-    to: userEmail,
-    subject: 'Password Reset Success',
-    html: htmlContent,
-  };
+    // const emailContent = {
+    //   from: environmentConfig.ADMIN_SEND_GRID_EMAIL,
+    //   to: userEmail,
+    //   subject: 'Password Reset Success',
+    //   html: htmlContent,
+    // };
 
-  transporter.sendMail(emailContent, function (error, _info) {
-    if (error) {
-      if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
-        console.log('Sending Email error:', error);
-      }
-    } else if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
-      console.log(`Successfully  send email to ${userEmail}...`);
+    // transporter.sendMail(emailContent, function (error, _info) {
+    //   if (error) {
+    //     if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+    //       console.log('Sending Email error:', error);
+    //     }
+    //   } else if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+    //     console.log(`Successfully  send email to ${userEmail}...`);
+    //   }
+    // });
+
+    const data = await resend.emails.send({
+      from: 'Arrarat Designs <no-reply@araratdesigns.org>',
+      to: userEmail,
+      subject: 'Password Reset Success',
+      html: htmlContent,
+    });
+
+    console.log(data, 'Resend Response');
+  } catch (error) {
+    console.log(error, 'error');
+    if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+      console.log('Sending Email error:', error);
+      console.log('Sending Email error:');
     }
-  });
+  }
 };
 
-export const sendEmailVerificationEmail = (userEmail: string, userName: string, link: string) => {
-  console.log(userEmail, userName, link, 'username, useremila, link');
-  htmlContent = `
+export const sendEmailVerificationEmail = async (userEmail: string, userName: string, link: string) => {
+  try {
+    htmlContent = `
 <!DOCTYPE html>
 <html lang="en-US">
   <head>
@@ -500,25 +540,40 @@ export const sendEmailVerificationEmail = (userEmail: string, userName: string, 
 </html>
 `;
 
-  const emailContent = {
-    from: environmentConfig.ADMIN_SEND_GRID_EMAIL,
-    to: userEmail,
-    subject: 'Email Verification',
-    html: htmlContent,
-  };
+    // const emailContent = {
+    //   from: environmentConfig.ADMIN_SEND_GRID_EMAIL,
+    //   to: userEmail,
+    //   subject: 'Email Verification',
+    //   html: htmlContent,
+    // };
 
-  transporter.sendMail(emailContent, function (error, _info) {
-    console.log(error, 'error');
-    console.log(_info, '_info');
-    if (error) {
-      if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
-        console.log('Sending Email error:', error);
-        console.log('Sending Email error:');
-      }
-    } else if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
-      console.log(`Successfully  send email to ${userEmail}...`);
+    // transporter.sendMail(emailContent, function (error, _info) {
+    //   console.log(error, 'error');
+    //   console.log(_info, '_info');
+    //   if (error) {
+    //     if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+    //       console.log('Sending Email error:', error);
+    //       console.log('Sending Email error:');
+    //     }
+    //   } else if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+    //     console.log(`Successfully  send email to ${userEmail}...`);
+    //   }
+    // });
+
+    const data = await resend.emails.send({
+      from: 'Arrarat Designs <no-reply@araratdesigns.org>',
+      to: userEmail,
+      subject: 'Email Verification',
+      html: htmlContent,
+    });
+
+    console.log(data, 'data');
+  } catch (error) {
+    console.log('Sending Email error:', error);
+    if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
+      console.log('Sending Email error:');
     }
-  });
+  }
 };
 
 export default { sendEmailVerificationEmail, sendEmail, sendResetPasswordEmail, sendConfirmResetPasswordEmail };
