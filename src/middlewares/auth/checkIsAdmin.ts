@@ -9,7 +9,8 @@ export const isAdmin = async (req: IAdminRequest, res: Response, next: NextFunct
   const user = req?.user;
 
   const adminEmails = environmentConfig?.ADMIN_EMAILS && (JSON.parse(environmentConfig.ADMIN_EMAILS) as string[]);
-  const adminUser = user && user.role === authorizationRoles.admin && adminEmails?.includes(`${user?.email}`);
+  // const adminUser = user && user.role === authorizationRoles.admin && adminEmails?.includes(`${user?.email}`);
+  const adminUser = adminEmails?.includes(`${user?.email}`);
 
   if (!adminUser) {
     return next(createHttpError(403, `Auth Failed (Unauthorized)`));
