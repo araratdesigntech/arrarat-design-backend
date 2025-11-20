@@ -32,7 +32,13 @@ try {
 }
 
 // Access Environment variables
-dotenv.config();
+// In Vercel, environment variables are already available, but dotenv.config() is safe to call
+try {
+  dotenv.config();
+} catch (error) {
+  // In serverless, env vars might already be set, so this is fine
+  console.warn('dotenv.config() failed (this is OK in serverless):', error);
+}
 
 colors.enable();
 
