@@ -64,7 +64,8 @@
     "uuid": "^9.0.0",
     "winston": "^3.8.2",
     "winston-mongodb": "^5.1.0",
-    "yamljs": "^0.3.0"
+    "yamljs": "^0.3.0",
+    "@vercel/node": "^3.0.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.0",

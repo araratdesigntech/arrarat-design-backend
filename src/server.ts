@@ -29,7 +29,11 @@ export const startServer = async () => {
   }
 };
 
-// Establish http server connection
-startServer();
+// Only start server if not in Vercel serverless environment
+// Vercel serverless functions don't use app.listen()
+if (process.env.VERCEL !== '1' && !process.env.VERCEL_ENV) {
+  // Establish http server connection
+  startServer();
+}
 
 export default app;

@@ -18,8 +18,18 @@ import api from '@src/api';
 // Import Middleware
 import { errorHandlerMiddleware, notFoundMiddleware } from '@src/middlewares';
 // Import Api Docs
-const swaggerDocument = YAML.load(`${process.cwd()}/swagger/swagger.yaml`);
-// const swaggerDocument = YAML.load('./docs/swagger.yaml');
+import path from 'path';
+
+// Handle file paths for both local and serverless environments
+const swaggerPath = path.join(process.cwd(), 'swagger', 'swagger.yaml');
+let swaggerDocument: any;
+try {
+  swaggerDocument = YAML.load(swaggerPath);
+} catch (error) {
+  // Fallback for serverless environments
+  console.warn('Could not load swagger.yaml, Swagger UI may not work:', error);
+  swaggerDocument = {};
+}
 
 // Access Environment variables
 dotenv.config();

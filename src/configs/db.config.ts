@@ -2,8 +2,15 @@ import mongoose, { ConnectOptions, Error } from 'mongoose';
 
 mongoose.set('strictQuery', true);
 
+// Cache connection for serverless environments
+let cachedConnection: any = null;
+
 // Connecting to MongoDB(Connecting to the Database)
-export const connectDB = (MONGODB_URI: any) => {
+export const connectDB = async (MONGODB_URI: any) => {
+  // Return cached connection if it exists and is connected
+  if (cachedConnection && mongoose.connection.readyState === 1) {
+    return cachedConnection;
+  }
   // @event connected: Emitted when this connection successfully connects to the db. May be emitted multiple times in reconnected scenarios
   mongoose.connection.on('connected', () => {
     if (process?.env?.NODE_ENV && process.env.NODE_ENV === 'development') {
@@ -64,13 +71,15 @@ export const connectDB = (MONGODB_URI: any) => {
   });
 
   // mongoose.connect return promise
-  mongoose.connect(MONGODB_URI, {
+  const connection = await mongoose.connect(MONGODB_URI, {
     keepAlive: true,
     useNewUrlParser: true,
     useUnifiedTopology: true,
   } as ConnectOptions);
 
-  return mongoose.connect(MONGODB_URI);
+  // Cache the connection for serverless environments
+  cachedConnection = connection;
+  return connection;
 };
 
 export default connectDB;
