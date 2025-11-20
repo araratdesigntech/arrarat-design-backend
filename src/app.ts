@@ -9,8 +9,28 @@ import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import colors from 'colors';
 
-// handle unhandled rejection error
-import '@src/middlewares/errors/unhandledRejection';
+// Handle unhandled rejection error (inlined to avoid path alias issues in Vercel)
+// Check if running in serverless environment (Vercel)
+const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+process.on('unhandledRejection', (reason: Error | any) => {
+  const message = reason?.message || reason || 'Unknown error';
+  console.error(`Unhandled Rejection: ${message}`);
+
+  // In serverless environments, don't throw - just log
+  // Throwing in unhandledRejection crashes the serverless function
+  if (!isServerless) {
+    throw new Error(message);
+  }
+});
+
+process.on('uncaughtException', (error: Error) => {
+  console.error(`Uncaught Exception: ${error.message}`);
+  // In serverless, don't exit - let Vercel handle it
+  if (!isServerless) {
+    // process.exit(1);
+  }
+});
 
 // Import Routes
 import api from '@src/api';

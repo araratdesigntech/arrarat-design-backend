@@ -1,5 +1,8 @@
+// Register path aliases FIRST (using .js file to ensure it runs)
+// This must happen before any imports that use @src/* aliases
+require('./_paths.js');
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// Use relative paths to avoid TypeScript path alias issues in Vercel
 import app from '../src/app';
 import { connectDB, environmentConfig } from '../src/configs/index';
 import mongoose from 'mongoose';

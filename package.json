@@ -8,6 +8,7 @@
     "prod": "node -r ts-node/register/transpile-only -r tsconfig-paths/register ./dist/src/server.js",
     "dev": "nodemon",
     "build": "tsc -p tsconfig.prod.json",
+    "vercel-build": "tsc -p tsconfig.prod.json",
     "lint": "eslint --fix",
     "check-types": "tsc --pretty --noEmit",
     "check-format": "prettier --check .",
