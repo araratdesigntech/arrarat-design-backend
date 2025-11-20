@@ -3,7 +3,6 @@ import express from 'express';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import cors from 'cors';
-import dotenv from 'dotenv-safe';
 import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
@@ -52,13 +51,8 @@ try {
 }
 
 // Access Environment variables
-// In Vercel, environment variables are already available, but dotenv.config() is safe to call
-try {
-  dotenv.config();
-} catch (error) {
-  // In serverless, env vars might already be set, so this is fine
-  console.warn('dotenv.config() failed (this is OK in serverless):', error);
-}
+// Note: dotenv-safe is configured in custom-environment-variables.config.ts
+// No need to call it here again - it's already handled there with serverless support
 
 colors.enable();
 

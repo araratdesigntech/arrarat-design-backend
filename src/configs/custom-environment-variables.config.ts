@@ -1,6 +1,39 @@
 import dotenv from 'dotenv-safe';
+import fs from 'fs';
+import path from 'path';
 
-dotenv.config();
+// Check if running in serverless environment (Vercel)
+const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+// Configure dotenv-safe
+// In serverless environments, skip .env.example check since env vars come from Vercel
+if (isServerless) {
+  // In serverless, use regular dotenv or skip if env vars are already set
+  try {
+    // Try to use regular dotenv if .env exists, otherwise skip (env vars are already set)
+    const envPath = path.join(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      require('dotenv').config();
+    }
+    // If .env doesn't exist, assume env vars are already set by Vercel
+  } catch (error) {
+    // Ignore - env vars are already available in Vercel
+    console.warn('Skipping dotenv in serverless environment (env vars already set)');
+  }
+} else {
+  // In local development, use dotenv-safe with .env.example validation
+  try {
+    dotenv.config();
+  } catch (error: any) {
+    // If .env.example doesn't exist, fall back to regular dotenv
+    if (error.code === 'ENOENT' && error.path && error.path.includes('.env.example')) {
+      console.warn('.env.example not found, using regular dotenv');
+      require('dotenv').config();
+    } else {
+      throw error;
+    }
+  }
+}
 
 export const environmentConfig = {
   MONGODB_CONNECTION_STRING: process.env.MONGODB_CONNECTION_STRING,
