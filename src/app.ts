@@ -37,7 +37,7 @@ dotenv.config();
 colors.enable();
 
 // Initialize app with express
-const app: express.Application | undefined = express();
+const app: express.Application = express();
 
 // Load App Middleware
 app.use(morgan('dev'));

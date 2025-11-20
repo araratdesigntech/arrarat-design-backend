@@ -45,6 +45,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Handle the request with Express app
   // @vercel/node automatically converts Express app to serverless function
+  if (!app) {
+    return res.status(500).json({ error: 'Application not initialized' });
+  }
+
   return app(req, res);
 }
 
