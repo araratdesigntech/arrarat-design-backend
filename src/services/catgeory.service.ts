@@ -18,14 +18,32 @@ export const createCategoryService = async (
 
   try {
     let cloudinaryResult;
-    if (req.file?.filename) {
-      const localFilePath = `${PWD}/public/uploads/categories/${req.file?.filename}`;
-      cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
-        folder: 'categories',
-      });
+    if (req.file) {
+      // Check if running in serverless (memory storage) or local (disk storage)
+      const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+      
+      if (isServerless && req.file.buffer) {
+        // In serverless, upload directly from buffer
+        cloudinaryResult = await new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: 'categories' },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          uploadStream.end(req.file.buffer);
+        });
+      } else if (req.file.filename) {
+        // Local development: upload from file path
+        const localFilePath = `${PWD}/public/uploads/categories/${req.file.filename}`;
+        cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
+          folder: 'categories',
+        });
 
-      // Remove file from local uploads folder
-      deleteFile(localFilePath);
+        // Remove file from local uploads folder
+        deleteFile(localFilePath);
+      }
     }
 
     const postData = new Category({
@@ -60,9 +78,10 @@ export const createCategoryService = async (
   } catch (error) {
     console.log(error, 'error');
 
-    // File Cleanup on Error
-    if (req.file?.filename) {
-      const localFilePath = `${PWD}/public/uploads/categories/${req.file?.filename}`;
+    // File Cleanup on Error (only for local file storage, not serverless)
+    const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+    if (!isServerless && req.file?.filename) {
+      const localFilePath = `${PWD}/public/uploads/categories/${req.file.filename}`;
       deleteFile(localFilePath);
     }
 
@@ -178,26 +197,45 @@ export const updateCategoryService = async (
       return next(new createHttpError.BadRequest());
     }
 
-    if (category.cloudinary_id && req.file?.filename) {
+    const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+    if (category.cloudinary_id && req.file && (isServerless ? req.file.buffer : req.file.filename)) {
       // Delete the old image from cloudinary
       await cloudinary.uploader.destroy(category.cloudinary_id);
     }
 
     let cloudinaryResult;
-    if (req.file?.filename) {
-      const localFilePath = `${PWD}/public/uploads/categories/${req.file?.filename}`;
+    if (req.file) {
+      // Check if running in serverless (memory storage) or local (disk storage)
+      const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+      
+      if (isServerless && req.file.buffer) {
+        // In serverless, upload directly from buffer
+        cloudinaryResult = await new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: 'categories' },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          uploadStream.end(req.file.buffer);
+        });
+      } else if (req.file.filename) {
+        // Local development: upload from file path
+        const localFilePath = `${PWD}/public/uploads/categories/${req.file.filename}`;
+        cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
+          folder: 'categories',
+        });
 
-      cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
-        folder: 'categories',
-      });
-
-      deleteFile(localFilePath);
+        deleteFile(localFilePath);
+      }
     }
 
     category.name = name || category.name;
     category.description = description || category.description;
 
-    category.image = req.file?.filename ? cloudinaryResult?.secure_url : category.image;
+    category.image = req.file && (isServerless ? req.file.buffer : req.file.filename) ? cloudinaryResult?.secure_url : category.image;
+    category.cloudinary_id = req.file && (isServerless ? req.file.buffer : req.file.filename) ? cloudinaryResult?.public_id : category.cloudinary_id;
 
     const updatedCategory = await category.save({ new: true });
 
@@ -224,9 +262,10 @@ export const updateCategoryService = async (
   } catch (error) {
     console.log(error, 'error');
 
-    // File Cleanup on Error
-    if (req.file?.filename) {
-      const localFilePath = `${PWD}/public/uploads/categories/${req.file?.filename}`;
+    // File Cleanup on Error (only for local file storage, not serverless)
+    const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+    if (!isServerless && req.file?.filename) {
+      const localFilePath = `${PWD}/public/uploads/categories/${req.file.filename}`;
       deleteFile(localFilePath);
     }
 
