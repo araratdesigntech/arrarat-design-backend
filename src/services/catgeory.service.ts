@@ -17,19 +17,24 @@ export const createCategoryService = async (
   const { name, description } = req.body;
 
   try {
-    let cloudinaryResult;
+    let cloudinaryResult: { secure_url?: string; public_id?: string } | undefined;
     if (req.file) {
       // Check if running in serverless (memory storage) or local (disk storage)
       const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
       
       if (isServerless && req.file.buffer) {
         // In serverless, upload directly from buffer
-        cloudinaryResult = await new Promise((resolve, reject) => {
+        cloudinaryResult = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+          if (!req.file?.buffer) {
+            reject(new Error('File buffer is missing'));
+            return;
+          }
           const uploadStream = cloudinary.uploader.upload_stream(
             { folder: 'categories' },
             (error, result) => {
               if (error) reject(error);
-              else resolve(result);
+              else if (result) resolve(result);
+              else reject(new Error('Upload failed: no result'));
             }
           );
           uploadStream.end(req.file.buffer);
@@ -39,7 +44,7 @@ export const createCategoryService = async (
         const localFilePath = `${PWD}/public/uploads/categories/${req.file.filename}`;
         cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
           folder: 'categories',
-        });
+        }) as { secure_url: string; public_id: string };
 
         // Remove file from local uploads folder
         deleteFile(localFilePath);
@@ -203,19 +208,24 @@ export const updateCategoryService = async (
       await cloudinary.uploader.destroy(category.cloudinary_id);
     }
 
-    let cloudinaryResult;
+    let cloudinaryResult: { secure_url?: string; public_id?: string } | undefined;
     if (req.file) {
       // Check if running in serverless (memory storage) or local (disk storage)
       const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
       
       if (isServerless && req.file.buffer) {
         // In serverless, upload directly from buffer
-        cloudinaryResult = await new Promise((resolve, reject) => {
+        cloudinaryResult = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+          if (!req.file?.buffer) {
+            reject(new Error('File buffer is missing'));
+            return;
+          }
           const uploadStream = cloudinary.uploader.upload_stream(
             { folder: 'categories' },
             (error, result) => {
               if (error) reject(error);
-              else resolve(result);
+              else if (result) resolve(result);
+              else reject(new Error('Upload failed: no result'));
             }
           );
           uploadStream.end(req.file.buffer);
@@ -225,7 +235,7 @@ export const updateCategoryService = async (
         const localFilePath = `${PWD}/public/uploads/categories/${req.file.filename}`;
         cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
           folder: 'categories',
-        });
+        }) as { secure_url: string; public_id: string };
 
         deleteFile(localFilePath);
       }
@@ -234,8 +244,10 @@ export const updateCategoryService = async (
     category.name = name || category.name;
     category.description = description || category.description;
 
-    category.image = req.file && (isServerless ? req.file.buffer : req.file.filename) ? cloudinaryResult?.secure_url : category.image;
-    category.cloudinary_id = req.file && (isServerless ? req.file.buffer : req.file.filename) ? cloudinaryResult?.public_id : category.cloudinary_id;
+    if (req.file && cloudinaryResult) {
+      category.image = cloudinaryResult.secure_url || category.image;
+      category.cloudinary_id = cloudinaryResult.public_id || category.cloudinary_id;
+    }
 
     const updatedCategory = await category.save({ new: true });
 
