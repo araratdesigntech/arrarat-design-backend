@@ -116,7 +116,7 @@ router.get(
   adminGetProductController
 );
 router.delete(
-  '/products/delete/:productId',
+  '/products/:productId',
   isAuth,
   customRoles(environmentConfig.ADMIN_EMAILS, authorizationRoles.admin),
   productIdValidation,
