@@ -374,31 +374,54 @@ export const adminAddProductService = async (
 
   const userId = req?.user?._id || '';
 
+  // Check if running in serverless (memory storage) or local (disk storage)
+  const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
   try {
     if (req.files) {
       for (let index = 0; index < req?.files?.length; index += 1) {
         // @ts-ignore
-        const element = req.files && req.files[index].filename;
+        const file = req.files && req.files[index];
+        
+        let cloudinaryResult: { secure_url?: string; public_id?: string } | undefined;
+        
+        if (isServerless && file.buffer) {
+          // In serverless, upload directly from buffer
+          cloudinaryResult = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+            if (!file.buffer) {
+              reject(new Error('File buffer is missing'));
+              return;
+            }
+            const uploadStream = cloudinary.uploader.upload_stream(
+              { folder: 'products' },
+              (error, result) => {
+                if (error) reject(error);
+                else if (result) resolve(result);
+                else reject(new Error('Upload failed: no result'));
+              }
+            );
+            uploadStream.end(file.buffer);
+          });
+        } else if (file.filename) {
+          // Local development: upload from file path
+          const localFilePath = `${PWD}/public/uploads/products/${file.filename}`;
+          
+          // eslint-disable-next-line no-await-in-loop
+          cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
+            folder: 'products',
+          }) as { secure_url: string; public_id: string };
 
-        // localFilePath: path of image which was just
-        // uploaded to "public/uploads/products" folder
-        const localFilePath = `${PWD}/public/uploads/products/${element}`;
+          // Remove file from local uploads folder
+          // eslint-disable-next-line no-await-in-loop
+          await deleteFile(localFilePath);
+        }
 
-        // eslint-disable-next-line no-await-in-loop
-        const result = await cloudinary.uploader.upload(localFilePath, {
-          folder: 'products',
-        });
-
-        imageUrlList.push({
-          url: result?.secure_url,
-          cloudinary_id: result?.public_id,
-        });
-
-        // Image has been successfully uploaded on
-        // cloudinary So we dont need local image file anymore
-        // Remove file from local uploads folder
-        // eslint-disable-next-line no-await-in-loop
-        await deleteFile(localFilePath);
+        if (cloudinaryResult) {
+          imageUrlList.push({
+            url: cloudinaryResult?.secure_url,
+            cloudinary_id: cloudinaryResult?.public_id,
+          });
+        }
       }
     }
 
@@ -456,13 +479,16 @@ export const adminAddProductService = async (
       })
     );
   } catch (error: any) {
-    if (req.files) {
+    // Only try to delete local files if not in serverless mode
+    if (req.files && !isServerless) {
       for (let index = 0; index < req?.files?.length; index += 1) {
         // @ts-ignore
-        const element = req.files && req.files[index].filename;
-        const localFilePath = `${PWD}/public/uploads/products/${element}`;
-        // eslint-disable-next-line no-await-in-loop
-        await deleteFile(localFilePath);
+        const file = req.files && req.files[index];
+        if (file?.filename) {
+          const localFilePath = `${PWD}/public/uploads/products/${file.filename}`;
+          // eslint-disable-next-line no-await-in-loop
+          await deleteFile(localFilePath);
+        }
       }
     }
     // return next(InternalServerError);
@@ -563,6 +589,9 @@ export const adminUpdateProductService = async (
 
   const { name, price, description, category, stock } = req.body;
 
+  // Check if running in serverless (memory storage) or local (disk storage)
+  const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
   try {
     const product = await Product.findById(req.params.productId);
     if (!product) {
@@ -575,24 +604,46 @@ export const adminUpdateProductService = async (
       // Upload new images
       for (let index = 0; index < req?.files?.length; index += 1) {
         // @ts-ignore
-        const element = req.files && req.files[index].filename;
+        const file = req.files && req.files[index];
+        
+        let cloudinaryResult: { secure_url?: string; public_id?: string } | undefined;
+        
+        if (isServerless && file.buffer) {
+          // In serverless, upload directly from buffer
+          cloudinaryResult = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+            if (!file.buffer) {
+              reject(new Error('File buffer is missing'));
+              return;
+            }
+            const uploadStream = cloudinary.uploader.upload_stream(
+              { folder: 'products' },
+              (error, result) => {
+                if (error) reject(error);
+                else if (result) resolve(result);
+                else reject(new Error('Upload failed: no result'));
+              }
+            );
+            uploadStream.end(file.buffer);
+          });
+        } else if (file.filename) {
+          // Local development: upload from file path
+          const localFilePath = `${PWD}/public/uploads/products/${file.filename}`;
 
-        // localFilePath: path of image which was just
-        // uploaded to "public/uploads/products" folder
-        const localFilePath = `${PWD}/public/uploads/products/${element}`;
+          // eslint-disable-next-line no-await-in-loop
+          cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
+            folder: 'products',
+          }) as { secure_url: string; public_id: string };
 
-        // eslint-disable-next-line no-await-in-loop
-        const result = await cloudinary.uploader.upload(localFilePath, {
-          folder: 'products',
-        });
+          // eslint-disable-next-line no-await-in-loop
+          await deleteFile(localFilePath);
+        }
 
-        imageUrlList.push({
-          url: result?.secure_url,
-          cloudinary_id: result?.public_id,
-        });
-
-        // eslint-disable-next-line no-await-in-loop
-        await deleteFile(localFilePath);
+        if (cloudinaryResult) {
+          imageUrlList.push({
+            url: cloudinaryResult?.secure_url,
+            cloudinary_id: cloudinaryResult?.public_id,
+          });
+        }
       }
 
       // Remove the old images
@@ -643,13 +694,16 @@ export const adminUpdateProductService = async (
       })
     );
   } catch (error: any) {
-    if (req.files) {
+    // Only try to delete local files if not in serverless mode
+    if (req.files && !isServerless) {
       for (let index = 0; index < req?.files?.length; index += 1) {
         // @ts-ignore
-        const element = req.files && req.files[index].filename;
-        const localFilePath = `${PWD}/public/uploads/products/${element}`;
-        // eslint-disable-next-line no-await-in-loop
-        await deleteFile(localFilePath);
+        const file = req.files && req.files[index];
+        if (file?.filename) {
+          const localFilePath = `${PWD}/public/uploads/products/${file.filename}`;
+          // eslint-disable-next-line no-await-in-loop
+          await deleteFile(localFilePath);
+        }
       }
     }
     return next(InternalServerError);
