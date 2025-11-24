@@ -94,8 +94,28 @@ app.use(
   })
 );
 
-// Serve all static files inside public directory.
-app.use('/static', express.static('public'));
+// Serve all static files inside public directory with cache control
+app.use('/static', express.static('public', {
+  maxAge: '1y', // Cache static assets for 1 year
+  immutable: true,
+  setHeaders: (res, path) => {
+    // Don't cache HTML files
+    if (path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
+// Add cache control middleware for API responses
+app.use('/api/v1', (req, res, next) => {
+  // Don't cache API responses by default
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // Routes which Should handle the requests
 app.use('/api/v1', api);
