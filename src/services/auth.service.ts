@@ -71,12 +71,14 @@ export const signupService = async (req: Request, res: Response<ResponseT<null>>
   }
 
   const PWD = process.env.PWD || process.cwd();
+  const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
 
   try {
     const isEmailExit = await User.findOne({ email: new RegExp(`^${email}$`, 'i') });
 
     if (isEmailExit) {
-      if (req.file?.filename) {
+      // Clean up uploaded file if it exists (only in local development)
+      if (req.file?.filename && !isServerless) {
         const localFilePath = `${PWD}/public/uploads/users/${req.file.filename}`;
         deleteFile(localFilePath);
       }
@@ -85,19 +87,44 @@ export const signupService = async (req: Request, res: Response<ResponseT<null>>
 
     let cloudinaryResult;
 
-    if (req.file?.filename) {
-      // localFilePath: path of image which was just
-      // uploaded to "public/uploads/users" folder
-      const localFilePath = `${PWD}/public/uploads/users/${req.file?.filename}`;
+    if (req.file) {
+      try {
+        if (isServerless && req.file.buffer) {
+          // In serverless (Vercel), file is in memory - upload directly from buffer
+          cloudinaryResult = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+              { folder: 'users' },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+              }
+            );
+            uploadStream.end(req.file.buffer);
+          });
+        } else if (req.file.filename) {
+          // Local development: file is on disk
+          const localFilePath = `${PWD}/public/uploads/users/${req.file.filename}`;
 
-      cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
-        folder: 'users',
-      });
+          cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
+            folder: 'users',
+          });
 
-      // Image has been successfully uploaded on
-      // cloudinary So we dont need local image file anymore
-      // Remove file from local uploads folder
-      deleteFile(localFilePath);
+          // Image has been successfully uploaded on cloudinary
+          // So we don't need local image file anymore
+          // Remove file from local uploads folder
+          deleteFile(localFilePath);
+        }
+      } catch (uploadError) {
+        // If Cloudinary upload fails, log error but continue with user creation
+        // User will be created without profile image
+        console.error('Cloudinary upload error during signup:', uploadError);
+        // Clean up local file if it exists (local development only)
+        if (req.file.filename && !isServerless) {
+          const localFilePath = `${PWD}/public/uploads/users/${req.file.filename}`;
+          deleteFile(localFilePath);
+        }
+        // Continue without profile image - cloudinaryResult will remain undefined
+      }
     }
 
     const newUser = new User({
@@ -180,8 +207,9 @@ export const signupService = async (req: Request, res: Response<ResponseT<null>>
     );
   } catch (error: any) {
     console.log(error, 'error');
-    // Remove file from local uploads folder
-    if (req.file?.filename) {
+    // Clean up uploaded file if it exists (only in local development)
+    const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+    if (req.file?.filename && !isServerless) {
       const localFilePath = `${PWD}/public/uploads/users/${req.file?.filename}`;
       deleteFile(localFilePath);
     }
@@ -473,7 +501,8 @@ export const updateAuthService = async (req: AuthenticatedRequestBody<IUser>, re
     if (email) {
       const existingUser = await User.findOne({ email: new RegExp(`^${email}$`, 'i') });
       if (existingUser && !existingUser._id.equals(user._id)) {
-        if (req.file?.filename) {
+        const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+        if (req.file?.filename && !isServerless) {
           const localFilePath = `${process.env.PWD}/public/uploads/users/${req.file.filename}`;
           deleteFile(localFilePath);
         }
@@ -481,25 +510,52 @@ export const updateAuthService = async (req: AuthenticatedRequestBody<IUser>, re
       }
     }
 
-    if (req.file?.filename && user.cloudinary_id) {
+    const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+    if (req.file && user.cloudinary_id) {
       // Delete the old image from cloudinary
       await cloudinary.uploader.destroy(user.cloudinary_id);
     }
 
     let cloudinaryResult;
-    if (req.file?.filename) {
-      // localFilePath: path of image which was just
-      // uploaded to "public/uploads/users" folder
-      const localFilePath = `${process.env.PWD}/public/uploads/users/${req.file?.filename}`;
+    if (req.file) {
+      try {
+        if (isServerless && req.file.buffer) {
+          // In serverless (Vercel), file is in memory - upload directly from buffer
+          cloudinaryResult = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+              { folder: 'users' },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+              }
+            );
+            uploadStream.end(req.file.buffer);
+          });
+        } else if (req.file.filename) {
+          // Local development: file is on disk
+          const localFilePath = `${process.env.PWD}/public/uploads/users/${req.file.filename}`;
 
-      cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
-        folder: 'users',
-      });
+          cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
+            folder: 'users',
+          });
 
-      // Image has been successfully uploaded on
-      // cloudinary So we dont need local image file anymore
-      // Remove file from local uploads folder
-      deleteFile(localFilePath);
+          // Image has been successfully uploaded on cloudinary
+          // So we don't need local image file anymore
+          // Remove file from local uploads folder
+          deleteFile(localFilePath);
+        }
+      } catch (uploadError) {
+        // If Cloudinary upload fails, log error but continue with user update
+        // User will be updated without changing profile image
+        console.error('Cloudinary upload error during user update:', uploadError);
+        // Clean up local file if it exists (local development only)
+        if (req.file.filename && !isServerless) {
+          const localFilePath = `${process.env.PWD}/public/uploads/users/${req.file.filename}`;
+          deleteFile(localFilePath);
+        }
+        // Continue without updating profile image - cloudinaryResult will remain undefined
+      }
     }
 
     user.name = name || user.name;
@@ -515,8 +571,8 @@ export const updateAuthService = async (req: AuthenticatedRequestBody<IUser>, re
     user.address = address || user.address;
     user.jobTitle = jobTitle || user.jobTitle;
     user.favoriteAnimal = favoriteAnimal || user.favoriteAnimal;
-    user.profileImage = req.file?.filename ? cloudinaryResult?.secure_url : user.profileImage;
-    user.cloudinary_id = req.file?.filename ? cloudinaryResult?.public_id : user.cloudinary_id;
+    user.profileImage = req.file ? (cloudinaryResult?.secure_url || user.profileImage) : user.profileImage;
+    user.cloudinary_id = req.file ? (cloudinaryResult?.public_id || user.cloudinary_id) : user.cloudinary_id;
 
     const updatedUser = await user.save({ validateBeforeSave: false, new: true });
 
