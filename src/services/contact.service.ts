@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import createHttpError from 'http-errors';
 import { Error } from 'mongoose';
 
-import { ContactT } from '@src/interfaces';
+import { AuthenticatedRequestBody, ContactT, IUser } from '@src/interfaces';
 import { customResponse } from '@src/utils';
 import Contact from '@src/models/Contact.model';
 
@@ -46,6 +46,63 @@ export const createContactService = async (
     } else {
       next(createHttpError(500, 'Failed to submit contact message'));
     }
+  }
+};
+
+// Get all contacts for admin
+export const getAllContactsService = async (
+  req: AuthenticatedRequestBody<IUser>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { page = 1, limit = 20, status, search } = req.query;
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query
+    const query: any = {};
+    if (status) {
+      query.status = status;
+    }
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } },
+        { message: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const contacts = await Contact.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .exec();
+
+    const total = await Contact.countDocuments(query);
+
+    return res.status(200).send(
+      customResponse({
+        success: true,
+        error: false,
+        status: 200,
+        message: 'Contacts fetched successfully',
+        data: {
+          contacts: contacts || [],
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total,
+            pages: Math.ceil(total / limitNum),
+          },
+        },
+      })
+    );
+  } catch (error) {
+    console.error('Error fetching contacts:', error);
+    next(createHttpError(500, 'Failed to fetch contacts'));
   }
 };
 

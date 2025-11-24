@@ -7,6 +7,7 @@ import { customResponse } from '@src/utils';
 import Order from '@src/models/Order.model';
 import Product from '@src/models/Product.model';
 import User from '@src/models/User.model';
+import { orderStatus } from '@src/constants/order';
 
 // Get dashboard overview stats
 export const getDashboardStatsService = async (
@@ -15,11 +16,12 @@ export const getDashboardStatsService = async (
   next: NextFunction
 ) => {
   try {
-    // Get total revenue (sum of all order amounts)
+    // Get total revenue (sum of all order amounts for confirmed/completed payments)
+    // Orders with payment_confirmed or completed status are considered paid
     const revenueResult = await Order.aggregate([
       {
         $match: {
-          paymentStatus: 'paid',
+          orderStatus: { $in: [orderStatus.paymentConfirmed, orderStatus.completed] },
         },
       },
       {
@@ -49,7 +51,7 @@ export const getDashboardStatsService = async (
     const todayRevenueResult = await Order.aggregate([
       {
         $match: {
-          paymentStatus: 'paid',
+          orderStatus: { $in: [orderStatus.paymentConfirmed, orderStatus.completed] },
           createdAt: { $gte: today },
         },
       },
@@ -70,7 +72,7 @@ export const getDashboardStatsService = async (
     const monthRevenueResult = await Order.aggregate([
       {
         $match: {
-          paymentStatus: 'paid',
+          orderStatus: { $in: [orderStatus.paymentConfirmed, orderStatus.completed] },
           createdAt: { $gte: thisMonth },
         },
       },
@@ -90,7 +92,7 @@ export const getDashboardStatsService = async (
     const lastMonthRevenueResult = await Order.aggregate([
       {
         $match: {
-          paymentStatus: 'paid',
+          orderStatus: { $in: [orderStatus.paymentConfirmed, orderStatus.completed] },
           createdAt: { $gte: lastMonth, $lt: thisMonth },
         },
       },
@@ -191,7 +193,7 @@ export const getRevenueTrendsService = async (
     const trends = await Order.aggregate([
       {
         $match: {
-          paymentStatus: 'paid',
+          orderStatus: { $in: [orderStatus.paymentConfirmed, orderStatus.completed] },
           createdAt: { $gte: startDate },
         },
       },
