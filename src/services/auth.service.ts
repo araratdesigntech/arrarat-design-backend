@@ -116,8 +116,8 @@ export const signupService = async (req: Request, res: Response<ResponseT<null>>
       nationality,
       companyName,
       role,
-      profileImage: cloudinaryResult?.secure_url,
-      cloudinary_id: cloudinaryResult?.public_id,
+      profileImage: cloudinaryResult?.secure_url || null,
+      cloudinary_id: cloudinaryResult?.public_id || null,
       acceptTerms:
         acceptTerms ||
         !!(

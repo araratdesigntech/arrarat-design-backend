@@ -86,8 +86,8 @@ export const adminAddUserService = async (req: Request, res: Response<ResponseT<
       address,
       nationality,
       companyName,
-      profileImage: cloudinaryResult?.secure_url,
-      cloudinary_id: cloudinaryResult?.public_id,
+      profileImage: cloudinaryResult?.secure_url || null,
+      cloudinary_id: cloudinaryResult?.public_id || null,
       acceptTerms: true,
     });
 

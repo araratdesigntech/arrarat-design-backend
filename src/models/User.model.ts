@@ -107,8 +107,8 @@ const UserSchema: Schema<IUserDocument> = new Schema(
     gender: { type: String, trim: true, lowercase: true },
     profileImage: {
       type: String,
-      required: true,
-      // default: '/static/uploads/users/temp.png',
+      required: false,
+      default: null,
       // lowercase: true,
     },
     cloudinary_id: {
