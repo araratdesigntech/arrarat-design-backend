@@ -56,28 +56,34 @@ export const adminAddUserService = async (req: Request, res: Response<ResponseT<
       return next(createHttpError(422, `E-Mail address ${email} is already exists, please pick a different one.`));
     }
 
-    let cloudinaryResult;
+    let cloudinaryResult: { secure_url?: string; public_id?: string } | undefined;
     if (req.file) {
+      const file = req.file; // Store in const for TypeScript
       try {
-        if (isServerless && req.file.buffer) {
+        if (isServerless && file.buffer) {
           // In serverless (Vercel), file is in memory - upload directly from buffer
-          cloudinaryResult = await new Promise((resolve, reject) => {
+          cloudinaryResult = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+            if (!file.buffer) {
+              reject(new Error('File buffer is missing'));
+              return;
+            }
             const uploadStream = cloudinary.uploader.upload_stream(
               { folder: 'users' },
               (error, result) => {
                 if (error) reject(error);
-                else resolve(result);
+                else if (result) resolve(result);
+                else reject(new Error('Cloudinary upload returned undefined result'));
               }
             );
-            uploadStream.end(req.file.buffer);
+            uploadStream.end(file.buffer);
           });
-        } else if (req.file.filename) {
+        } else if (file.filename) {
           // Local development: file is on disk
-          const localFilePath = `${PWD}/public/uploads/users/${req.file.filename}`;
+          const localFilePath = `${PWD}/public/uploads/users/${file.filename}`;
 
           cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
             folder: 'users',
-          });
+          }) as { secure_url: string; public_id: string };
 
           // Image has been successfully uploaded on cloudinary
           // So we don't need local image file anymore
@@ -89,8 +95,8 @@ export const adminAddUserService = async (req: Request, res: Response<ResponseT<
         // User will be created without profile image
         console.error('Cloudinary upload error during admin user creation:', uploadError);
         // Clean up local file if it exists (local development only)
-        if (req.file.filename && !isServerless) {
-          const localFilePath = `${PWD}/public/uploads/users/${req.file.filename}`;
+        if (file.filename && !isServerless) {
+          const localFilePath = `${PWD}/public/uploads/users/${file.filename}`;
           deleteFile(localFilePath);
         }
         // Continue without profile image - cloudinaryResult will remain undefined
@@ -243,28 +249,34 @@ export const adminUpdateAuthService = async (
       await cloudinary.uploader.destroy(user.cloudinary_id);
     }
 
-    let cloudinaryResult;
+    let cloudinaryResult: { secure_url?: string; public_id?: string } | undefined;
     if (req.file) {
+      const file = req.file; // Store in const for TypeScript
       try {
-        if (isServerless && req.file.buffer) {
+        if (isServerless && file.buffer) {
           // In serverless (Vercel), file is in memory - upload directly from buffer
-          cloudinaryResult = await new Promise((resolve, reject) => {
+          cloudinaryResult = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+            if (!file.buffer) {
+              reject(new Error('File buffer is missing'));
+              return;
+            }
             const uploadStream = cloudinary.uploader.upload_stream(
               { folder: 'users' },
               (error, result) => {
                 if (error) reject(error);
-                else resolve(result);
+                else if (result) resolve(result);
+                else reject(new Error('Cloudinary upload returned undefined result'));
               }
             );
-            uploadStream.end(req.file.buffer);
+            uploadStream.end(file.buffer);
           });
-        } else if (req.file.filename) {
+        } else if (file.filename) {
           // Local development: file is on disk
-          const localFilePath = `${PWD}/public/uploads/users/${req.file.filename}`;
+          const localFilePath = `${PWD}/public/uploads/users/${file.filename}`;
 
           cloudinaryResult = await cloudinary.uploader.upload(localFilePath, {
             folder: 'users',
-          });
+          }) as { secure_url: string; public_id: string };
 
           // Image has been successfully uploaded on cloudinary
           // So we don't need local image file anymore
@@ -276,8 +288,8 @@ export const adminUpdateAuthService = async (
         // User will be updated without changing profile image
         console.error('Cloudinary upload error during admin user update:', uploadError);
         // Clean up local file if it exists (local development only)
-        if (req.file.filename && !isServerless) {
-          const localFilePath = `${PWD}/public/uploads/users/${req.file.filename}`;
+        if (file.filename && !isServerless) {
+          const localFilePath = `${PWD}/public/uploads/users/${file.filename}`;
           deleteFile(localFilePath);
         }
         // Continue without updating profile image - cloudinaryResult will remain undefined
