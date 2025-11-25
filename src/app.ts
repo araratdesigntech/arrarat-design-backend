@@ -94,7 +94,7 @@ app.use(
   })
 );
 
-// Serve all static files inside public directory with cache control
+// Serve all the static files inside public directory with cache control
 app.use('/static', express.static('public', {
   maxAge: '1y', // Cache static assets for 1 year
   immutable: true,
