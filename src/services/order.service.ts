@@ -1,6 +1,9 @@
 import { NextFunction, Response } from 'express';
 import createHttpError, { InternalServerError } from 'http-errors';
 import fs from 'fs';
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
 
 import { AuthenticatedRequestBody, IUser, OrderItemT, OrderT, ProcessingOrderT } from '@src/interfaces';
 import { customResponse, generateInvoiceNumber, generateInvoicePdf, buildWhatsappMessageLink } from '@src/utils';
@@ -237,9 +240,18 @@ export const postOrderService = async (
     }
 
     console.log('Generating invoice PDF for order:', orderedItem._id);
+    console.log('Order items count:', orderedItem.orderItems?.length || 0);
+    console.log('Order items:', JSON.stringify(orderedItem.orderItems?.slice(0, 2) || [], null, 2));
+    
     let invoicePdf;
     try {
-      invoicePdf = await generateInvoicePdf({ order: orderedItem as unknown as OrderT, invoiceNumber });
+      // Ensure orderItems is properly accessible
+      const orderForPdf = {
+        ...orderedItem.toObject(),
+        orderItems: orderedItem.orderItems || [],
+      } as unknown as OrderT;
+      
+      invoicePdf = await generateInvoicePdf({ order: orderForPdf, invoiceNumber });
     } catch (pdfError: any) {
       console.error('Error generating invoice PDF:', pdfError);
       return next(createHttpError(500, `Failed to generate invoice PDF: ${pdfError.message || 'Unknown error'}`));
@@ -264,8 +276,8 @@ export const postOrderService = async (
           email: authUser.email,
           phone: authUser.mobileNumber || shippingInfo.phoneNo,
         },
-        documentPath: invoicePdf.absolutePath,
-        documentUrl: invoicePdf.relativePath,
+        documentPath: invoicePdf.absolutePath || null, // null in serverless
+        documentUrl: invoicePdf.documentUrl, // Use documentUrl (Cloudinary URL in serverless, relative path in local)
         whatsappMessageUrl: whatsappUrl,
         adminWhatsappSnapshot: settings.adminWhatsappNumber,
         status: 'sent',
@@ -505,13 +517,28 @@ export const getInvoicesService = async (req: AuthenticatedRequestBody<IUser>, r
       return next(createHttpError(404, 'Invoice not found for this order'));
     }
 
-    if (!invoice.documentPath || !fs.existsSync(invoice.documentPath)) {
+    // Check if invoice document exists (for local) or if documentUrl is missing (for serverless)
+    const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME;
+    const needsRegeneration = isServerless
+      ? !invoice.documentUrl // In serverless, check if documentUrl exists
+      : !invoice.documentPath || !fs.existsSync(invoice.documentPath); // In local, check if file exists
+
+    if (needsRegeneration) {
+      console.log('Regenerating invoice PDF for order:', order._id);
+      console.log('Order items count:', order.orderItems?.length || 0);
+      
+      // Ensure orderItems is properly accessible
+      const orderForPdf = {
+        ...order.toObject(),
+        orderItems: order.orderItems || [],
+      } as unknown as OrderT;
+      
       const regenerated = await generateInvoicePdf({
-        order: order as unknown as OrderT,
+        order: orderForPdf,
         invoiceNumber: invoice.invoiceNumber,
       });
       invoice.documentPath = regenerated.absolutePath;
-      invoice.documentUrl = regenerated.relativePath;
+      invoice.documentUrl = regenerated.documentUrl;
       invoice = await invoice.save();
     }
 
@@ -527,11 +554,42 @@ export const getInvoicesService = async (req: AuthenticatedRequestBody<IUser>, r
       );
     }
 
+    // Handle PDF download
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${invoice.invoiceNumber}.pdf"`);
-    const stream = fs.createReadStream(invoice.documentPath as string);
-    stream.on('error', (err) => next(err));
-    stream.pipe(res);
+
+    if (isServerless && invoice.documentUrl) {
+      // In serverless, fetch PDF from Cloudinary URL and stream it
+      try {
+        const pdfUrl = new URL(invoice.documentUrl);
+        const httpModule = pdfUrl.protocol === 'https:' ? https : http;
+        const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
+          httpModule
+            .get(pdfUrl, (response) => {
+              if (response.statusCode !== 200) {
+                reject(new Error(`Failed to fetch PDF: ${response.statusCode}`));
+                return;
+              }
+              const chunks: Buffer[] = [];
+              response.on('data', (chunk: Buffer) => chunks.push(chunk));
+              response.on('end', () => resolve(Buffer.concat(chunks)));
+              response.on('error', reject);
+            })
+            .on('error', reject);
+        });
+        res.send(pdfBuffer);
+      } catch (fetchError: any) {
+        console.error('Error fetching invoice PDF from Cloudinary:', fetchError);
+        return next(createHttpError(500, `Failed to fetch invoice PDF: ${fetchError.message || 'Unknown error'}`));
+      }
+    } else if (invoice.documentPath && fs.existsSync(invoice.documentPath)) {
+      // Local development: read from disk
+      const stream = fs.createReadStream(invoice.documentPath);
+      stream.on('error', (err) => next(err));
+      stream.pipe(res);
+    } else {
+      return next(createHttpError(404, 'Invoice PDF not found'));
+    }
   } catch (error) {
     return next(InternalServerError);
   }

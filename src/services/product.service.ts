@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import createHttpError, { InternalServerError } from 'http-errors';
+import mongoose from 'mongoose';
 
 import {
   AddProductToCartT,
@@ -109,38 +110,201 @@ export const addProductToCartService = async (
   res: Response,
   next: NextFunction
 ) => {
-  try {
-    const product = await Product.findById(req.body.productId).populate('category');
+  const MAX_RETRIES = 3;
+  let retries = 0;
 
-    if (!product) {
-      return next(new createHttpError.BadRequest());
+  while (retries < MAX_RETRIES) {
+    try {
+      const product = await Product.findById(req.body.productId).populate('category');
+
+      if (!product) {
+        return next(new createHttpError.BadRequest());
+      }
+
+      const doDecrease = req.query.decrease === 'true';
+      const userId = req.user?._id;
+
+      if (!userId) {
+        return next(createHttpError(401, `Auth Failed`));
+      }
+
+      // Use atomic MongoDB operations with arrayFilters for reliable updates
+      const productIdObj = new mongoose.Types.ObjectId(req.body.productId);
+      
+      if (doDecrease) {
+        // For decrease: atomically decrement, then remove if quantity becomes 0
+        // First, try to decrement
+        const decrementResult = await User.findOneAndUpdate(
+          {
+            _id: userId,
+            'cart.items.productId': productIdObj,
+            'cart.items.quantity': { $gt: 1 } // Only decrement if quantity > 1
+          },
+          {
+            $inc: {
+              'cart.items.$.quantity': -1
+            }
+          },
+          {
+            new: true,
+            runValidators: false
+          }
+        ).select('cart').lean();
+
+        if (decrementResult) {
+          // Successfully decremented, fetch full user
+          const updatedUser = await User.findById(userId)
+            .select('-password -confirmPassword -status');
+          
+          if (!updatedUser) {
+            return next(createHttpError(404, 'User not found'));
+          }
+
+          const data = {
+            user: updatedUser,
+          };
+
+          return res.status(201).send(
+            customResponse<typeof data>({
+              success: true,
+              error: false,
+              message: `Successfully decreased product quantity in cart: ${req.body.productId}`,
+              status: 201,
+              data,
+            })
+          );
+        }
+
+        // If decrement didn't work, try to remove (quantity was 1)
+        const removeResult = await User.findOneAndUpdate(
+          {
+            _id: userId,
+            'cart.items.productId': productIdObj,
+            'cart.items.quantity': 1
+          },
+          {
+            $pull: {
+              'cart.items': { productId: productIdObj }
+            }
+          },
+          {
+            new: true,
+            runValidators: false
+          }
+        ).select('-password -confirmPassword -status');
+
+        if (removeResult) {
+          const data = {
+            user: removeResult,
+          };
+
+          return res.status(201).send(
+            customResponse<typeof data>({
+              success: true,
+              error: false,
+              message: `Product removed from cart (quantity was 1): ${req.body.productId}`,
+              status: 201,
+              data,
+            })
+          );
+        }
+
+        // Item not found in cart
+        return next(createHttpError(404, 'Product not found in cart'));
+      } else {
+        // For increase: check if item exists and increment, or add new
+        const incrementResult = await User.findOneAndUpdate(
+          {
+            _id: userId,
+            'cart.items.productId': productIdObj
+          },
+          {
+            $inc: {
+              'cart.items.$.quantity': 1
+            }
+          },
+          {
+            new: true,
+            runValidators: false
+          }
+        ).select('-password -confirmPassword -status');
+
+        if (incrementResult) {
+          // Successfully incremented existing item
+          const data = {
+            user: incrementResult,
+          };
+
+          return res.status(201).send(
+            customResponse<typeof data>({
+              success: true,
+              error: false,
+              message: `Successfully increased product quantity in cart: ${req.body.productId}`,
+              status: 201,
+              data,
+            })
+          );
+        }
+
+        // Item doesn't exist - add new item atomically
+        const addResult = await User.findOneAndUpdate(
+          {
+            _id: userId
+          },
+          {
+            $push: {
+              'cart.items': {
+                productId: productIdObj,
+                quantity: 1
+              }
+            }
+          },
+          {
+            new: true,
+            runValidators: false,
+            upsert: false
+          }
+        ).select('-password -confirmPassword -status');
+
+        if (!addResult) {
+          return next(createHttpError(404, 'User not found'));
+        }
+
+        const data = {
+          user: addResult,
+        };
+
+        return res.status(201).send(
+          customResponse<typeof data>({
+            success: true,
+            error: false,
+            message: `Successfully added product to cart: ${req.body.productId}`,
+            status: 201,
+            data,
+          })
+        );
+      }
+    } catch (error: any) {
+      // Check if it's a version conflict error
+      if (error.name === 'VersionError' || error.message?.includes('No matching document found')) {
+        retries++;
+        if (retries >= MAX_RETRIES) {
+          console.error(`Failed to update cart after ${MAX_RETRIES} retries:`, error);
+          return next(createHttpError(409, 'Cart update conflict. Please try again.'));
+        }
+        // Wait a bit before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 100 * retries));
+        continue; // Retry the operation
+      }
+      
+      // For other errors, return immediately
+      console.error('Error adding product to cart:', error);
+      return next(error);
     }
-
-    const user = await User.findOne({ email: req.user?.email });
-
-    if (!user) {
-      return next(createHttpError(401, `Auth Failed`));
-    }
-
-    const doDecrease = req.query.decrease === 'true';
-    const updatedUser = await user.addToCart(req.body.productId, doDecrease);
-
-    const data = {
-      user: updatedUser,
-    };
-
-    return res.status(201).send(
-      customResponse<typeof data>({
-        success: true,
-        error: false,
-        message: `Successfully added product to cart: ${req.body.productId}`,
-        status: 201,
-        data,
-      })
-    );
-  } catch (error) {
-    return next(error);
   }
+  
+  // This should never be reached, but TypeScript requires it
+  return next(createHttpError(500, 'Unexpected error: Maximum retries exceeded'));
 };
 
 export const deleteProductFromCartService = async (
