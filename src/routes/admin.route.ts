@@ -97,8 +97,6 @@ router.put(
   isAuth,
   customRoles(environmentConfig.ADMIN_EMAILS, authorizationRoles.admin),
   uploadImage.array('productImages'),
-  isAuth,
-  customRoles(environmentConfig.ADMIN_EMAILS, authorizationRoles.admin),
   updateProductValidation,
   adminUpdateProductController
 );

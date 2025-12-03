@@ -53,7 +53,9 @@ export const updateProductValidation: RequestHandler = (req, res, next) => {
   // In disk storage (local), files have filename
   let productImages = req.files;
   
-  if (productImages && Array.isArray(productImages)) {
+  // Only process and include productImages if files are actually uploaded
+  // For updates, images are optional
+  if (productImages && Array.isArray(productImages) && productImages.length > 0) {
     productImages = productImages.map((file: Express.Multer.File) => {
       // If file doesn't have filename, use originalname (serverless mode)
       if (!file.filename) {
@@ -74,15 +76,25 @@ export const updateProductValidation: RequestHandler = (req, res, next) => {
       // If filename exists, return as is
       return file;
     });
+  } else {
+    // No files uploaded - set to undefined so it's not included in validation
+    productImages = undefined;
+  }
+  
+  // Build validation data - only include productImages if files were uploaded
+  const validationData: any = {
+    ...req.params,
+    ...req.body,
+  };
+  
+  // Only add productImages to validation if files were actually uploaded
+  if (productImages && Array.isArray(productImages) && productImages.length > 0) {
+    validationData.productImages = productImages;
   }
   
   return validator(
     productSchema.updateProduct,
-    {
-      ...req.params,
-      productImages: productImages,
-      ...req.body,
-    },
+    validationData,
     next
   );
 };

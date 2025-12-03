@@ -33,14 +33,17 @@ export const productSchema = {
     stock: Joi.string(),
     mobileNumber: Joi.string(),
     gender: Joi.string(),
-    productImages: Joi.array().items(
-      Joi.object()
-        .keys({
-          filename: Joi.string().required().label('Invalid request (Please upload Image)'),
-        })
-        .required()
-        .label('Invalid request (Please upload Image)')
-    ),
+    productImages: Joi.array()
+      .items(
+        Joi.object()
+          .keys({
+            filename: Joi.string().required().label('Invalid request (Please upload Image)'),
+          })
+          .required()
+          .label('Invalid request (Please upload Image)')
+      )
+      .optional()
+      .allow(null, ''),
     count: Joi.number(),
   }),
   reviewProduct: Joi.object({

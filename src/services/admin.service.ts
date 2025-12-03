@@ -623,7 +623,9 @@ export const adminGetProductService = async (
   }
 
   try {
-    const product = await Product.findById(req.params.productId);
+    const product = await Product.findById(req.params.productId)
+      .populate('category', 'name _id')
+      .exec();
 
     if (!product) {
       return next(new createHttpError.BadRequest());
