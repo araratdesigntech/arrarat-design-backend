@@ -14,7 +14,9 @@ export const createCategoryService = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { name, description, minimumAmount } = req.body;
+  const { name, description } = req.body;
+  // minimumAmount can come as string or number from FormData
+  const minimumAmount = (req.body as any).minimumAmount as string | number | undefined;
 
   try {
     let cloudinaryResult: { secure_url?: string; public_id?: string } | undefined;
@@ -51,12 +53,25 @@ export const createCategoryService = async (
       }
     }
 
+    // Handle minimumAmount - it can come as number or string from FormData
+    let minAmount = 0;
+    if (minimumAmount !== undefined && minimumAmount !== null) {
+      if (typeof minimumAmount === 'string' && minimumAmount.trim() !== '') {
+        const parsed = Number(minimumAmount);
+        if (!isNaN(parsed) && parsed >= 0) {
+          minAmount = parsed;
+        }
+      } else if (typeof minimumAmount === 'number' && minimumAmount >= 0) {
+        minAmount = minimumAmount;
+      }
+    }
+
     const postData = new Category({
       name,
       description,
       image: cloudinaryResult?.secure_url,
       cloudinary_id: cloudinaryResult?.public_id,
-      minimumAmount: minimumAmount ? Number(minimumAmount) : 0,
+      minimumAmount: minAmount,
     });
 
     const createdCategory = await Category.create(postData);
@@ -194,7 +209,9 @@ export const updateCategoryService = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { name, description, minimumAmount } = req.body;
+  const { name, description } = req.body;
+  // minimumAmount can come as string or number from FormData
+  const minimumAmount = (req.body as any).minimumAmount as string | number | undefined;
 
   try {
     const category = await Category.findById(req.params.categoryId).exec();
@@ -249,8 +266,17 @@ export const updateCategoryService = async (
     if (description !== undefined && description !== null && description !== '') {
       category.description = description;
     }
-    if (minimumAmount !== undefined && minimumAmount !== null && minimumAmount !== '') {
-      category.minimumAmount = Number(minimumAmount);
+    // Handle minimumAmount - it can come as number or string from FormData
+    if (minimumAmount !== undefined && minimumAmount !== null) {
+      // Check if it's a string and not empty, or if it's a number
+      if (typeof minimumAmount === 'string' && minimumAmount.trim() !== '') {
+        const parsed = Number(minimumAmount);
+        if (!isNaN(parsed) && parsed >= 0) {
+          category.minimumAmount = parsed;
+        }
+      } else if (typeof minimumAmount === 'number' && minimumAmount >= 0) {
+        category.minimumAmount = minimumAmount;
+      }
     }
 
     if (req.file && cloudinaryResult) {
