@@ -14,7 +14,7 @@ export const createCategoryService = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { name, description } = req.body;
+  const { name, description, minimumAmount } = req.body;
 
   try {
     let cloudinaryResult: { secure_url?: string; public_id?: string } | undefined;
@@ -56,6 +56,7 @@ export const createCategoryService = async (
       description,
       image: cloudinaryResult?.secure_url,
       cloudinary_id: cloudinaryResult?.public_id,
+      minimumAmount: minimumAmount ? Number(minimumAmount) : 0,
     });
 
     const createdCategory = await Category.create(postData);
@@ -193,7 +194,7 @@ export const updateCategoryService = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { name, description } = req.body;
+  const { name, description, minimumAmount } = req.body;
 
   try {
     const category = await Category.findById(req.params.categoryId).exec();
@@ -241,8 +242,16 @@ export const updateCategoryService = async (
       }
     }
 
-    category.name = name || category.name;
-    category.description = description || category.description;
+    // Only update fields if they are provided and not empty
+    if (name !== undefined && name !== null && name !== '') {
+      category.name = name;
+    }
+    if (description !== undefined && description !== null && description !== '') {
+      category.description = description;
+    }
+    if (minimumAmount !== undefined && minimumAmount !== null && minimumAmount !== '') {
+      category.minimumAmount = Number(minimumAmount);
+    }
 
     if (req.file && cloudinaryResult) {
       category.image = cloudinaryResult.secure_url || category.image;

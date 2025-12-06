@@ -5,4 +5,5 @@ export interface CategoryT extends Document {
   description: string;
   image: string;
   cloudinary_id?: string;
+  minimumAmount?: number;
 }

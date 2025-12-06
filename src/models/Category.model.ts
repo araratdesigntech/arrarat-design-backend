@@ -28,6 +28,12 @@ export const CategorySchema: Schema<CategoryT> = new Schema(
     cloudinary_id: {
       type: String,
     },
+    minimumAmount: {
+      type: Number,
+      required: false,
+      min: 0,
+      default: 0,
+    },
   },
   {
     timestamps: true,
