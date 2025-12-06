@@ -19,6 +19,6 @@ router.get('/', categoryPaginationMiddleware(), getCategoriesController);
 router.post('/', uploadImage.single('image'), isAuth, addCategoryValidation, createCategoryController);
 router.get('/:categoryId', categoryIdValidation, getCategoryController);
 router.delete('/:categoryId', isAuth, categoryIdValidation, deleteCategoryController);
-router.patch('/:categoryId', updateCategoryValidation, uploadImage.single('image'), isAuth, updateCategoryController);
+router.patch('/:categoryId', uploadImage.single('image'), isAuth, updateCategoryValidation, updateCategoryController);
 
 export = router;

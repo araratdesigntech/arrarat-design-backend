@@ -13,29 +13,37 @@ export const categorySchema = {
     minimumAmount: Joi.number().min(0).optional().allow('', null),
   }),
   updateCategory: Joi.object({
-    name: Joi.string().optional().allow('', null).custom((value, helpers) => {
-      // Only validate min length if value is provided and not empty
-      if (value && value.trim().length > 0 && value.trim().length < 3) {
-        return helpers.error('string.min');
+    name: Joi.string().allow('', null).optional().custom((value, helpers) => {
+      // If value is empty, null, or undefined, allow it (skip validation)
+      if (!value || value === '' || value === null || (typeof value === 'string' && value.trim() === '')) {
+        return value;
       }
-      if (value && value.length > 100) {
-        return helpers.error('string.max');
+      // If value exists and is not empty, validate length
+      const trimmed = String(value).trim();
+      if (trimmed.length < 3) {
+        return helpers.error('any.custom', { message: 'Name must be at least 3 characters long' });
       }
-      return value;
-    }).messages({
-      'string.min': 'Name must be at least 3 characters long',
-      'string.max': 'Name must not exceed 100 characters',
-    }),
-    description: Joi.string().optional().allow('', null).custom((value, helpers) => {
-      // Only validate min length if value is provided and not empty
-      if (value && value.trim().length > 0 && value.trim().length < 5) {
-        return helpers.error('string.min');
+      if (trimmed.length > 100) {
+        return helpers.error('any.custom', { message: 'Name must not exceed 100 characters' });
       }
       return value;
-    }).messages({
-      'string.min': 'Description must be at least 5 characters long',
     }),
-    minimumAmount: Joi.number().min(0).optional().allow('', null),
+    description: Joi.string().allow('', null).optional().custom((value, helpers) => {
+      // If value is empty, null, or undefined, allow it (skip validation)
+      if (!value || value === '' || value === null || (typeof value === 'string' && value.trim() === '')) {
+        return value;
+      }
+      // If value exists and is not empty, validate length
+      const trimmed = String(value).trim();
+      if (trimmed.length < 5) {
+        return helpers.error('any.custom', { message: 'Description must be at least 5 characters long' });
+      }
+      return value;
+    }),
+    minimumAmount: Joi.alternatives().try(
+      Joi.number().min(0),
+      Joi.string().allow('', null)
+    ).optional(),
   }),
   validatedCategoryId: Joi.object({
     categoryId: vaildObjectId().required(),
