@@ -6,8 +6,8 @@
   "scripts": {
     "nodemon": "nodemon",
     "prod": "node -r ts-node/register/transpile-only -r tsconfig-paths/register ./dist/src/server.js",
-    "dev": "nodemon",
-    "build": "tsc -p tsconfig.prod.json",
+    "dev": "node init && nodemon",
+    "build": "node init && tsc -p tsconfig.prod.json",
     "vercel-build": "tsc -p tsconfig.prod.json",
     "lint": "eslint --fix",
     "check-types": "tsc --pretty --noEmit",
@@ -18,11 +18,11 @@
     "test:watch": "export NODE_ENV=testing || SET \"NODE_ENV=testing\" && jest --detectOpenHandles --forceExit  --watchAll",
     "test:coverage": "export NODE_ENV=testing || SET \"NODE_ENV=testing\" && jest --coverage --detectOpenHandles",
     "test-all": "npm run check-format && npm run check-lint && npm run check-types && npm run test && npm  build",
-    "start": "node -r ts-node/register/transpile-only -r tsconfig-paths/register ./dist/src/server.js",
+    "start": "node init && node -r ts-node/register/transpile-only -r tsconfig-paths/register ./dist/src/server.js",
     "postinstall": "tsc",
-    "start-test": "ts-node src/server.ts",
-    "dev-test": "nodemon src/server.ts",
-    "build-test": "tsc"
+    "start-test": "node init && ts-node src/server.ts",
+    "dev-test": "node init && nodemon src/server.ts",
+    "build-test": "node init && tsc"
   },
   "keywords": [],
   "author": "Okpabi Counsel",
